@@ -1,0 +1,2 @@
+# bytedesk-mrcp
+mrcp server
