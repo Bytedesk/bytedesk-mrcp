@@ -38,3 +38,95 @@
 四 说明
 
 1. 开启音频保存后，audio目录下的文件请定时清理。log目录下的日志也需要定时清理
+
+五 Docker 使用说明
+
+1. 仓库根目录的 docker-compose.yaml 是本地演示和调试用文件，用于快速启动当前目录下的 MRCP Server。
+2. GitHub Actions 打包发布流程文件位于 .github/workflows/mrcp-docker.yml，用于构建并推送 Docker 镜像，不作为本地运行配置使用。
+3. 由于仓库内自带的 bin/unimrcpserver 为 Linux x86_64 ELF 二进制镜像，Docker 镜像仅支持 linux/amd64。
+4. plugin 目录下的大型 .so 文件通过 Git LFS 管理，构建镜像前请先执行 git lfs pull，确保本地已拿到真实文件。
+
+六 使用 Docker Compose 本地启动
+
+1. 准备 Docker 环境。如果是 Apple Silicon 机器，建议启用 buildx，并使用 linux/amd64 平台构建。
+1. 首次构建镜像：
+
+```bash
+git lfs pull
+docker compose build
+```
+
+1. 启动服务：
+
+```bash
+docker compose up -d
+```
+
+1. 查看日志：
+
+```bash
+docker compose logs -f mrcp-server
+```
+
+1. 停止服务：
+
+```bash
+docker compose down
+```
+
+七 使用外部 conf 覆盖内置配置
+
+1. 默认会把 mrcp-server/conf 挂载到容器内的 /opt/mrcp-server/conf。
+1. 如果希望使用外部目录覆盖配置，可以在仓库根目录创建 conf 目录，并复制需要修改的配置文件。
+1. 然后通过环境变量指定该目录：
+
+```bash
+mkdir -p conf
+cp mrcp-server/conf/unimrcpserver.xml conf/
+cp mrcp-server/conf/mrcp-asr.conf conf/
+
+MRCP_CONF_DIR=./conf docker compose up -d
+```
+
+1. docker-compose.yaml 同时支持以下环境变量：
+
+```bash
+MRCP_IMAGE=bytedesk/mrcp
+MRCP_TAG=latest
+MRCP_CONTAINER_NAME=mrcp-server
+MRCP_PORT=1544
+RTSP_PORT=1554
+SIP_PORT=5060
+RTP_PORT_RANGE=5000-6000
+MRCP_CONF_DIR=./conf
+MRCP_LOG_DIR=./docker/log
+MRCP_AUDIO_DIR=./docker/audio
+```
+
+八 镜像打包与发布
+
+1. 工作流文件：.github/workflows/mrcp-docker.yml
+1. 触发方式：
+    - 推送标签 mrcp-v1.0.0
+    - 在 GitHub Actions 页面手动执行 workflow_dispatch
+1. 工作流会执行以下动作：
+    - checkout 仓库并拉取 Git LFS 文件
+    - 构建 linux/amd64 Docker 镜像
+    - 按需推送到 Docker Hub 和阿里云镜像仓库
+    - 在标签发布时创建 GitHub Release
+1. 需要预先配置的 GitHub Secrets：
+    - DOCKER_HUB_USERNAME
+    - DOCKER_HUB_ACCESS_TOKEN
+    - ALIYUN_DOCKER_USERNAME
+    - ALIYUN_DOCKER_PASSWORD
+
+九 常见注意事项
+
+1. 如果在 macOS Apple Silicon 上本地构建失败，请改用：
+
+```bash
+DOCKER_DEFAULT_PLATFORM=linux/amd64 docker compose build
+```
+
+1. RTP 使用 5000-6000/udp 端口范围，部署到云主机或容器平台时需要同步放通该端口段。
+1. 如果修改了对外服务 IP、SIP 端口或 RTP 范围，请同步检查 mrcp-server/conf/unimrcpserver.xml 和 mrcp-server/conf/unimrcpserver_control.conf 中的相关配置。

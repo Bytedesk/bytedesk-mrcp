@@ -1,0 +1,20 @@
+services:
+  mrcp-server:
+    image: ${MRCP_IMAGE:-bytedesk/mrcp}:${MRCP_TAG:-latest}
+    build:
+      context: .
+      dockerfile: Dockerfile
+      platforms:
+        - linux/amd64
+    container_name: ${MRCP_CONTAINER_NAME:-mrcp-server}
+    ports:
+      - "${MRCP_PORT:-1544}:1544"
+      - "${RTSP_PORT:-1554}:1554"
+      - "${SIP_PORT:-5060}:5060/udp"
+      - "${SIP_PORT:-5060}:5060/tcp"
+      - "${RTP_PORT_RANGE:-5000-6000}:5000-6000/udp"
+    volumes:
+      - ${MRCP_CONF_DIR:-./mrcp-server/conf}:/opt/mrcp-server/conf:ro
+      - ${MRCP_LOG_DIR:-./docker/log}:/opt/mrcp-server/log
+      - ${MRCP_AUDIO_DIR:-./docker/audio}:/opt/mrcp-server/audio
+    restart: unless-stopped
