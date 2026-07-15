@@ -1,0 +1,259 @@
+# Mrcp Docker Image Build and Push Workflow
+# 自动构建 Mrcp Docker 镜像并推送到 Docker Hub 和阿里云镜像仓库
+
+name: Build Mrcp Docker
+
+on:
+  push:
+    tags:
+      # 匹配 v 开头的标签，例如: v1.10.12
+      - 'v*'
+  workflow_dispatch:
+    # 支持手动触发
+    inputs:
+      version:
+        description: 'Mrcp version to build (e.g., 1.10.12)'
+        required: true
+        default: '1.10.12'
+      push_to_registry:
+        description: 'Push to Docker registries'
+        required: true
+        default: 'true'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+
+# 添加权限配置
+permissions:
+  contents: write
+  packages: write
+
+env:
+  # 镜像名称
+  IMAGE_NAME: bytedesk/mrcp
+  ALIYUN_IMAGE_NAME: registry.cn-hangzhou.aliyuncs.com/bytedesk/mrcp
+
+jobs:
+  build-and-push:
+    name: Build and Push Mrcp Docker Image
+    runs-on: ubuntu-latest
+    
+    steps:
+      # 1. 检出代码
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # 2. 提取版本号
+      - name: Extract version
+        id: version
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            # 从标签提取版本号，例如: mrcp-v1.10.12 -> 1.10.12
+            VERSION="${GITHUB_REF_NAME#mrcp-v}"
+          fi
+          echo "VERSION=${VERSION}" >> $GITHUB_OUTPUT
+          echo "Building Mrcp version: ${VERSION}"
+
+      # 3. 设置 JDK 并打包应用 JAR
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Build Mrcp JAR
+        run: ./mvnw clean package -Dmaven.test.skip=true
+
+      # 4. 设置 QEMU (支持多平台构建)
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      # 5. 设置 Docker Buildx
+      - name: Set up Docker Buildx
+        id: buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          version: latest
+          driver-opts: |
+            image=moby/buildkit:latest
+            network=host
+
+      # 6. 登录 Docker Hub
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: bytedesk
+          password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
+          logout: false
+
+      # 7. 登录阿里云 Docker Registry
+      - name: Login to Aliyun Docker Registry
+        uses: docker/login-action@v3
+        with:
+          registry: registry.cn-hangzhou.aliyuncs.com
+          username: ${{ secrets.ALIYUN_DOCKER_USERNAME }}
+          password: ${{ secrets.ALIYUN_DOCKER_PASSWORD }}
+          logout: false
+
+      # 8. 准备构建元数据
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            ${{ env.IMAGE_NAME }}
+            ${{ env.ALIYUN_IMAGE_NAME }}
+          tags: |
+            type=raw,value=${{ steps.version.outputs.VERSION }}
+            type=raw,value=latest
+          labels: |
+            org.opencontainers.image.title=ByteDesk Mrcp
+            org.opencontainers.image.description=Mrcp Docker image for ByteDesk Call Center
+            org.opencontainers.image.version=${{ steps.version.outputs.VERSION }}
+            org.opencontainers.image.vendor=ByteDesk
+            maintainer=ByteDesk <270580156@qq.com>
+
+      # 9. 构建并推送到阿里云 Docker Registry
+      - name: Build and push to Aliyun Docker Registry
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          builder: ${{ steps.buildx.outputs.name }}
+          platforms: linux/amd64,linux/arm64
+          push: ${{ github.event.inputs.push_to_registry != 'false' }}
+          tags: |
+            ${{ env.ALIYUN_IMAGE_NAME }}:latest
+            ${{ env.ALIYUN_IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          provenance: false
+
+      # 10. 构建并推送到 Docker Hub
+      - name: Build and push to Docker Hub
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          builder: ${{ steps.buildx.outputs.name }}
+          platforms: linux/amd64,linux/arm64
+          push: ${{ github.event.inputs.push_to_registry != 'false' }}
+          tags: |
+            ${{ env.IMAGE_NAME }}:latest
+            ${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          provenance: false
+
+      # 11. 创建 GitHub Release（仅在推送标签时）
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/mrcp-v')
+        uses: softprops/action-gh-release@v1
+        with:
+          name: Mrcp v${{ steps.version.outputs.VERSION }}
+          body: |
+            ## Mrcp Docker 镜像发布
+            
+            **版本**: ${{ steps.version.outputs.VERSION }}  
+            **应用**: bytedesk-mrcp  
+            **基础镜像**: eclipse-temurin:21-jdk
+            
+            ### 📦 Docker 镜像
+            
+            #### Docker Hub
+            ```bash
+            docker pull bytedesk/mrcp:${{ steps.version.outputs.VERSION }}
+            # 或者
+            docker pull bytedesk/mrcp:latest
+            ```
+            
+            #### 阿里云镜像仓库（中国大陆用户推荐）
+            ```bash
+            docker pull registry.cn-hangzhou.aliyuncs.com/bytedesk/mrcp:${{ steps.version.outputs.VERSION }}
+            # 或者
+            docker pull registry.cn-hangzhou.aliyuncs.com/bytedesk/mrcp:latest
+            ```
+            
+            ### 🚀 快速启动
+            
+            ```bash
+            docker run -d \
+              --name mrcp-bytedesk \
+              -p 9103:9103 \
+              -e SPRING_SECURITY_USER_NAME=admin \
+              -e SPRING_SECURITY_USER_PASSWORD=admin \
+              -e TZ=Asia/Shanghai \
+              bytedesk/mrcp:${{ steps.version.outputs.VERSION }}
+            ```
+            
+            ### 📋 功能特性
+            
+            - ✅ 基于 Spring Boot Admin Server
+            - ✅ 提供统一应用健康监控与指标查看
+            - ✅ 支持 Spring Security 登录认证
+            - ✅ 支持 Actuator 健康检查
+            - ✅ 支持环境变量配置
+            
+            ### 🔧 环境变量
+            
+            | 变量名 | 说明 | 默认值 |
+            |--------|------|--------|
+            | SPRING_SECURITY_USER_NAME | Mrcp 登录用户名 | admin |
+            | SPRING_SECURITY_USER_PASSWORD | Mrcp 登录密码 | admin |
+            | TZ | 时区 | Asia/Shanghai |
+            
+            ### 📚 文档
+            
+            - [项目 README](https://github.com/${{ github.repository }}/blob/main/README.md)
+            - [中文文档](https://github.com/${{ github.repository }}/blob/main/readme.zh.md)
+            
+            ### 🔗 相关链接
+            
+            - Docker Hub: https://hub.docker.com/r/bytedesk/mrcp
+            - 阿里云镜像: https://cr.console.aliyun.com/repository/cn-hangzhou/bytedesk/mrcp
+            - 访问地址: http://127.0.0.1:9103
+            
+            ---
+            
+            **构建时间**: ${{ steps.meta.outputs.created }}  
+            **提交 SHA**: ${{ github.sha }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # 12. 输出构建信息
+      - name: Build Summary
+        run: |
+          echo "## 🎉 Mrcp Docker 镜像构建成功" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📦 镜像信息" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **版本**: ${{ steps.version.outputs.VERSION }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **应用**: bytedesk-mrcp" >> $GITHUB_STEP_SUMMARY
+          echo "- **平台**: linux/amd64, linux/arm64" >> $GITHUB_STEP_SUMMARY
+          echo "- **构建时间**: $(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🐳 Docker Hub" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo '```bash' >> $GITHUB_STEP_SUMMARY
+          echo "docker pull bytedesk/mrcp:${{ steps.version.outputs.VERSION }}" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### ☁️ 阿里云镜像仓库" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo '```bash' >> $GITHUB_STEP_SUMMARY
+          echo "docker pull registry.cn-hangzhou.aliyuncs.com/bytedesk/mrcp:${{ steps.version.outputs.VERSION }}" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🔗 相关链接" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- [Docker Hub](https://hub.docker.com/r/bytedesk/mrcp)" >> $GITHUB_STEP_SUMMARY
+          echo "- [阿里云镜像](https://cr.console.aliyun.com/repository/cn-hangzhou/bytedesk/mrcp)" >> $GITHUB_STEP_SUMMARY
+          echo "- [使用文档](https://github.com/${{ github.repository }}/blob/main/README.md)" >> $GITHUB_STEP_SUMMARY

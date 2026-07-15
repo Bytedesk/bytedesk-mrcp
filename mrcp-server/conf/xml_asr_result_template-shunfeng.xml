@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<result>
+    <interpretation grammar="$$$grammar$$$" confidence="$$$confidence$$$">
+        <instance>
+            <speech-to-text>$$$asr_result$$$</speech-to-text>
+            <start-time>$$$timestamp_start$$$</start-time>
+            <end-time>$$$timestamp_end$$$</end-time>
+            <channel_id>$$$session_id$$$</channel_id>
+        </instance>
+        <input mode="speech">$$$asr_result$$$</input>
+    </interpretation>
+</result>

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<result>
+    <interpretation grammar="$$$grammar$$$" confidence="$$$confidence$$$">
+        <instance>
+            <speech-to-text confidence="$$$confidence$$$">[$$$session_id$$$_$$$request_id$$$_$$$chunk_index$$$]$$$asr_result$$$</speech-to-text>
+        </instance>
+        <input mode="$$$input_mode$$$" timestamp-start="$$$timestamp_start$$$" timestamp-end="$$$timestamp_end$$$">$$$asr_result$$$</input>
+    </interpretation>
+</result>

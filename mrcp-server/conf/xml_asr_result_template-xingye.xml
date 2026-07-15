@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<result>
+<interpretation mode="ats" grammar="$$$grammar$$$" confidence="$$$confidence$$$">
+     <input mode="speech">$$$asr_result$$$</input>
+     <instance verify="no">
+           <id>$$$asr_result$$$</id>
+     <meaning>$$$asr_result$$$</meaning>
+     </instance>
+  </interpretation>
+</result>

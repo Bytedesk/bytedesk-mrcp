@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<result>
+    <asr confidence="$$$confidence$$$">$$$asr_result$$$</asr>
+    <ext>
+        <logid>$$$session_id$$$_$$$request_id$$$_$$$chunk_index$$$</logid>
+    </ext>
+</result>
