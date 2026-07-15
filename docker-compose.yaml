@@ -1,11 +1,30 @@
+# ---- bytedesk MRCP Server ----
+# 默认从阿里云镜像仓库拉取运行（国内访问最快）。
+# 如需本地构建，请取消下方 build 段的注释并执行:
+#   git lfs pull && docker compose build
+#
+# 环境变量 (均可选):
+#   MRCP_IMAGE        - 镜像地址 (默认阿里云)
+#   MRCP_TAG          - 镜像标签 (默认 latest)
+#   MRCP_CONTAINER_NAME - 容器名
+#   MRCP_PORT         - MRCP 端口 (默认 1544)
+#   RTSP_PORT         - RTSP 端口 (默认 1554)
+#   SIP_PORT          - SIP 端口 (默认 5060)
+#   RTP_PORT_RANGE    - RTP 端口范围 (默认 5000-6000)
+#   MRCP_CONF_DIR     - 配置文件目录 (默认 ./mrcp-server/conf)
+#   MRCP_LOG_DIR      - 日志目录 (默认 ./docker/log)
+#   MRCP_AUDIO_DIR    - 音频目录 (默认 ./docker/audio)
+
 services:
   mrcp-server:
-    image: ${MRCP_IMAGE:-bytedesk/mrcp}:${MRCP_TAG:-latest}
-    build:
-      context: .
-      dockerfile: Dockerfile
-      platforms:
-        - linux/amd64
+    image: ${MRCP_IMAGE:-registry.cn-hangzhou.aliyuncs.com/bytedesk/mrcp}:${MRCP_TAG:-latest}
+    pull_policy: always
+    # ---- 如需本地构建，取消以下注释 ----
+    # build:
+    #   context: .
+    #   dockerfile: Dockerfile
+    #   platforms:
+    #     - linux/amd64
     container_name: ${MRCP_CONTAINER_NAME:-mrcp-server}
     ports:
       - "${MRCP_PORT:-1544}:1544"

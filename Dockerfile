@@ -12,11 +12,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         uuid-runtime \
     && rm -rf /var/lib/apt/lists/*
 
-# The binary's rpath includes /opt/compiler/gcc-8.2/lib64, so symlink
-# the system GCC runtime libs to that path so the loader can find them.
-RUN mkdir -p /opt/compiler/gcc-8.2/lib64 && \
-    ln -sf /lib/x86_64-linux-gnu/libgcc_s.so.1       /opt/compiler/gcc-8.2/lib64/libgcc_s.so.1  && \
-    ln -sf /usr/lib/x86_64-linux-gnu/libstdc++.so.6  /opt/compiler/gcc-8.2/lib64/libstdc++.so.6
+# The binary's interpreter (dynamic linker) and rpath point to
+# /opt/compiler/gcc-8.2/lib64 and /opt/compiler/gcc-8.2/lib.
+# Symlink the system GCC runtime libs and the dynamic linker so the
+# loader can find everything at the expected paths.
+RUN mkdir -p /opt/compiler/gcc-8.2/lib64 /opt/compiler/gcc-8.2/lib && \
+    ln -sf /lib/x86_64-linux-gnu/ld-linux-x86-64.so.2  /opt/compiler/gcc-8.2/lib64/ld-linux-x86-64.so.2  && \
+    ln -sf /lib/x86_64-linux-gnu/libgcc_s.so.1          /opt/compiler/gcc-8.2/lib64/libgcc_s.so.1  && \
+    ln -sf /usr/lib/x86_64-linux-gnu/libstdc++.so.6     /opt/compiler/gcc-8.2/lib64/libstdc++.so.6
 
 WORKDIR /opt/mrcp-server
 

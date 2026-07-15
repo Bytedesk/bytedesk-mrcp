@@ -45,40 +45,79 @@
 
 五 Docker 使用说明
 
-1. 仓库根目录的 docker-compose.yaml 是本地演示和调试用文件，用于快速启动当前目录下的 MRCP Server。
-2. GitHub Actions 打包发布流程文件位于 .github/workflows/mrcp-docker.yml，用于构建并推送 Docker 镜像，不作为本地运行配置使用。
-3. 由于仓库内自带的 bin/unimrcpserver 为 Linux x86_64 ELF 二进制镜像，Docker 镜像仅支持 linux/amd64。
-4. plugin 目录下的大型 .so 文件通过 Git LFS 管理，构建镜像前请先执行 git lfs pull，确保本地已拿到真实文件。
+默认镜像为阿里云仓库（国内访问最快）：`registry.cn-hangzhou.aliyuncs.com/bytedesk/mrcp`
 
-六 使用 Docker Compose 本地启动
-
-1. 准备 Docker 环境。如果是 Apple Silicon 机器，建议启用 buildx，并使用 linux/amd64 平台构建。
-1. 首次构建镜像：
-
+Docker Hub 镜像地址：`bytedesk/mrcp`，可通过环境变量切换：
 ```bash
-git lfs pull
-docker compose build
+MRCP_IMAGE=bytedesk/mrcp docker compose up -d
 ```
 
-1. 启动服务：
+注意事项：
+- 由于仓库内自带的 bin/unimrcpserver 为 Linux x86_64 ELF 二进制，Docker 镜像仅支持 **linux/amd64**。
+- plugin 目录下的大型 .so 文件通过 Git LFS 管理，本地构建前请先执行 `git lfs pull`。
+- 镜像已在 Dockerfile 中预置了 gcc 运行时库和动态链接器的 symlink，无需额外执行 bootstrap.sh。
+
+六 快速启动（从镜像仓库拉取运行）
+
+`docker-compose.yaml` 默认配置为拉取阿里云镜像直接运行。
+
+1. 准备配置文件目录（镜像内置了默认配置，外部覆盖需要完整配置文件）：
+
+```bash
+mkdir -p conf docker/log docker/audio
+cp mrcp-server/conf/unimrcpserver.xml conf/
+cp mrcp-server/conf/mrcp-asr.conf conf/
+# 编辑 conf/unimrcpserver.xml 修改 IP 地址
+# 编辑 conf/mrcp-asr.conf 修改 AUTH_APPID / AUTH_APPKEY
+```
+
+> ⚠️ **重要**：如果使用外部 conf 目录挂载，必须包含完整的配置文件（至少 `unimrcpserver.xml`、`mrcp-asr.conf`、`dirlayout.xml`），否则容器将因缺少配置而启动失败。
+
+2. 拉取并启动：
 
 ```bash
 docker compose up -d
 ```
 
-1. 查看日志：
+3. 查看日志：
 
 ```bash
 docker compose logs -f mrcp-server
 ```
 
-1. 停止服务：
+4. 停止服务：
 
 ```bash
 docker compose down
 ```
 
-七 使用外部 conf 覆盖内置配置
+七 本地构建镜像运行
+
+如需修改源码或插件后自行构建，取消 `docker-compose.yaml` 中 `build:` 段的注释：
+
+```yaml
+    # ---- 如需本地构建，取消以下注释 ----
+    build:
+      context: .
+      dockerfile: Dockerfile
+      platforms:
+        - linux/amd64
+```
+
+然后执行：
+
+```bash
+git lfs pull
+docker compose build
+docker compose up -d
+```
+
+> Apple Silicon 机器上如果构建失败，请使用：
+> ```bash
+> DOCKER_DEFAULT_PLATFORM=linux/amd64 docker compose build
+> ```
+
+八 使用外部 conf 覆盖内置配置
 
 1. 默认会把 mrcp-server/conf 挂载到容器内的 /opt/mrcp-server/conf。
 1. 如果希望使用外部目录覆盖配置，可以在仓库根目录创建 conf 目录，并复制需要修改的配置文件。
@@ -95,7 +134,7 @@ MRCP_CONF_DIR=./conf docker compose up -d
 1. docker-compose.yaml 同时支持以下环境变量：
 
 ```bash
-MRCP_IMAGE=bytedesk/mrcp
+MRCP_IMAGE=registry.cn-hangzhou.aliyuncs.com/bytedesk/mrcp
 MRCP_TAG=latest
 MRCP_CONTAINER_NAME=mrcp-server
 MRCP_PORT=1544
@@ -107,7 +146,7 @@ MRCP_LOG_DIR=./docker/log
 MRCP_AUDIO_DIR=./docker/audio
 ```
 
-八 镜像打包与发布
+九 镜像打包与发布
 
 1. 工作流文件：.github/workflows/mrcp-docker.yml
 1. 触发方式：
@@ -124,7 +163,7 @@ MRCP_AUDIO_DIR=./docker/audio
     - ALIYUN_DOCKER_USERNAME
     - ALIYUN_DOCKER_PASSWORD
 
-九 常见注意事项
+十 常见注意事项
 
 1. 如果在 macOS Apple Silicon 上本地构建失败，请改用：
 
