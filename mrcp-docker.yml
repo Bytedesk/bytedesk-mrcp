@@ -1,0 +1,48 @@
+# mrcp-docker.yml — Build, run, and push the UniMRCP server image
+#
+# Common commands:
+#   Build image:
+#     docker compose -f mrcp-docker.yml build
+#
+#   Build & push to registry:
+#     docker compose -f mrcp-docker.yml build
+#     docker compose -f mrcp-docker.yml push
+#
+#   Run server (with external conf):
+#     docker compose -f mrcp-docker.yml up -d
+#
+#   On Apple Silicon (cross-build for linux/amd64):
+#     DOCKER_DEFAULT_PLATFORM=linux/amd64 docker compose -f mrcp-docker.yml build
+
+version: '3.8'
+
+services:
+  mrcp-server:
+    image: ${MRCP_IMAGE:-bytedesk/mrcp-server}:${MRCP_TAG:-latest}
+    build:
+      context: .
+      dockerfile: Dockerfile
+      platforms:
+        - linux/amd64
+    ports:
+      - "${MRCP_PORT:-1544}:1544"
+      - "${RTSP_PORT:-1554}:1554"
+      - "${SIP_PORT:-5060}:5060/udp"
+      - "${SIP_PORT:-5060}:5060/tcp"
+      - "5000-6000:5000-6000/udp"
+    volumes:
+      # Mount an external conf directory to override the built-in configuration.
+      # Create a local conf/ folder, copy and edit the files you need to change,
+      # then restart the container — only the files you place here will override
+      # the defaults baked into the image.
+      - ${MRCP_CONF_DIR:-./mrcp-server/conf}:/opt/mrcp-server/conf:ro
+      # Persist logs and recorded audio outside the container
+      - mrcp-log:/opt/mrcp-server/log
+      - mrcp-audio:/opt/mrcp-server/audio
+    restart: unless-stopped
+    # The server runs as the default user; override UID/GID if needed:
+    # user: "1000:1000"
+
+volumes:
+  mrcp-log:
+  mrcp-audio:

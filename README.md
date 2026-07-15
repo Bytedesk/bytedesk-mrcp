@@ -1,2 +1,40 @@
 # bytedesk-mrcp
-mrcp server
+
+欢迎使用百度语音提供的mrcpserver服务
+
+本MRCP Server端，集成了语音识别(ASR)和语音合成(TTS)两种能力，用户可分别单独使用某一种或同时使用。
+
+一 目录结构介绍
+
+1. compiler.tar.gz, 本程序运行依赖的百度内部自带的gcc-8.2编译器库文件
+2. bootstrap.sh: 解压安装gcc-8.2的脚本
+3. mrcp_server: 目录下存放本程序运行文件
+    1. audio：用来保存用户说话和服务端下发播报的音频。
+    2. bin: 一些工具程序。其中的unimrcpserver就是我们要启动的服务。
+    3. conf: 配置文件。unimrcpserver.conf为mrcp框架的配置文件；mrcp-asr.conf为ASR插件运行的配置文件,mrcp-proxy.conf为TTS插件运行的配置文件。
+    4. data: 一些资源文件。
+    5. lib: 程序运行依赖的库文件。
+    6. log: 日志输出。
+    7. plugin：包含ASR和TTS的so库。
+
+二 运行准备
+
+1. 首先要使用root权限执行bootstrap.sh，将compiler.tar.gz解压安装到/opt/目录,也可手动解压.
+    确认解压完后路径是形如：/opt/compiler/gcc-8.2/的形式。
+2. 本server ip可以在./conf/unimrcpserver.conf文件中将unimrcpserver->property->ip的值修改为本机对外服务网口的IP，sip端口5060可酌情修改。
+3. ./conf/unimrcpserver.conf文件中, 高并发时需要修改的参数有：max-connection-count表示最大连接数，需要时请修改;
+   rtp端口范围默认1000，必要时需要修改：rtp-port-min为5000，修改rtp-port-max为8000，表示共3千个端口
+4. ./conf/mrcp.conf中修改AUDIO_CONTROLLER_ADDR的值为要连接的百度服务地址(默认值当前有效),
+    AUTH_APPID和AUTH_APPKEY修改为用户向百度申请的值.
+    其它字段基本不用调整！
+5. ./conf/comlog.conf是日志相关配置，一般地不需要修改。4和16代表日志打印等级，如不需要debug日志调试，可都设为4
+6. 根据在第2中手动修改的server ip，在./conf/unimrcpserver_control.conf文件，将其中的_check_cmd_pro中的启动监听的ip值设置为相应的server ip;
+
+三 启动方法
+
+1. 一般的，在调试部署初期，可以使用如下命令启动程序：./bin/unimrcpserver -r . &，可查看输出，方便定位问题。
+2. 做为服务程序运行时，建议使用提供的supervise以守护进程的形式启动. 使用./bin/unimrcpserver_control start/stop/restart进行程序的启动/停止/重启
+
+四 说明
+
+1. 开启音频保存后，audio目录下的文件请定时清理。log目录下的日志也需要定时清理
