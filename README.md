@@ -1,132 +1,148 @@
 # bytedesk-mrcp
 
-欢迎使用百度语音提供的mrcpserver服务
+Welcome to the MRCP Server service powered by Baidu Speech.
 
-本MRCP Server端，集成了语音识别(ASR)和语音合成(TTS)两种能力，用户可分别单独使用某一种或同时使用。
+This MRCP Server integrates both Automatic Speech Recognition (ASR) and Text-to-Speech (TTS) capabilities. You may use either one independently or both together.
 
-一 目录结构介绍
+**Language:** [English](README.md) | [中文](README.zh.md)
 
-1. compiler.tar.gz, 本程序运行依赖的百度内部自带的gcc-8.2编译器库文件
-2. bootstrap.sh: 解压安装gcc-8.2的脚本
-3. mrcp_server: 目录下存放本程序运行文件
-    1. audio：用来保存用户说话和服务端下发播报的音频。
-    2. bin: 一些工具程序。其中的unimrcpserver就是我们要启动的服务。
-    3. conf: 配置文件。unimrcpserver.conf为mrcp框架的配置文件；mrcp-asr.conf为ASR插件运行的配置文件,mrcp-proxy.conf为TTS插件运行的配置文件。
-    4. data: 一些资源文件。
-    5. lib: 程序运行依赖的库文件。
-    6. log: 日志输出。
-    7. plugin：包含ASR和TTS的so库。
+> **Mirror:** [GitHub](https://github.com/Bytedesk/bytedesk-mrcp) | [Gitee](https://gitee.com/bytedesk/bytedesk-mrcp)
 
-二 运行准备
+## 1. Directory Structure
 
-1. 首先要使用root权限执行bootstrap.sh，将compiler.tar.gz解压安装到/opt/目录,也可手动解压.
-    确认解压完后路径是形如：/opt/compiler/gcc-8.2/的形式。
-2. 本server ip可以在./conf/unimrcpserver.conf文件中将unimrcpserver->property->ip的值修改为本机对外服务网口的IP，sip端口5060可酌情修改。
-3. ./conf/unimrcpserver.conf文件中, 高并发时需要修改的参数有：max-connection-count表示最大连接数，需要时请修改;
-   rtp端口范围默认1000，必要时需要修改：rtp-port-min为5000，修改rtp-port-max为8000，表示共3千个端口
-4. ./conf/mrcp.conf中修改AUDIO_CONTROLLER_ADDR的值为要连接的百度服务地址(默认值当前有效),
-    AUTH_APPID和AUTH_APPKEY修改为用户向百度申请的值.
-    其它字段基本不用调整！
-5. ./conf/comlog.conf是日志相关配置，一般地不需要修改。4和16代表日志打印等级，如不需要debug日志调试，可都设为4
-6. 根据在第2中手动修改的server ip，在./conf/unimrcpserver_control.conf文件，将其中的_check_cmd_pro中的启动监听的ip值设置为相应的server ip;
+1. `compiler.tar.gz` — Bundled GCC 8.2 compiler runtime libraries required by the application.
+2. `bootstrap.sh` — Script to extract and install GCC 8.2.
+3. `mrcp-server/` — Runtime files for the service:
+    1. `audio/` — Stores audio recordings of user speech and server-side playback.
+    2. `bin/` — Utility programs. `unimrcpserver` is the main server binary.
+    3. `conf/` — Configuration files. `unimrcpserver.xml` is the MRCP framework configuration; `mrcp-asr.conf` is the ASR plugin configuration; `mrcp-proxy.conf` is the TTS plugin configuration.
+    4. `data/` — Resource files.
+    5. `lib/` — Shared libraries required at runtime.
+    6. `log/` — Log output directory.
+    7. `plugin/` — ASR and TTS shared object (`.so`) plugins.
 
-三 启动方法
+## 2. Setup Prerequisites
 
-1. 一般的，在调试部署初期，可以使用如下命令启动程序：./bin/unimrcpserver -r . &，可查看输出，方便定位问题。
-2. 做为服务程序运行时，建议使用提供的supervise以守护进程的形式启动. 使用./bin/unimrcpserver_control start/stop/restart进行程序的启动/停止/重启
+1. First, run `bootstrap.sh` as **root** (or extract manually) to install `compiler.tar.gz` under `/opt/`. After extraction the path should be `/opt/compiler/gcc-8.2/`.
+2. Set the server IP in `./conf/unimrcpserver.xml`: change the value of `unimrcpserver → property → ip` to the IP address of the network interface that serves external traffic. The SIP port (default `5060`) may also be adjusted as needed.
+3. For high-concurrency scenarios, tune the following parameters in `./conf/unimrcpserver.xml`:
+   - `max-connection-count` — Maximum number of connections.
+   - RTP port range (default 1000 ports): set `rtp-port-min` to `5000` and `rtp-port-max` to `8000` for 3,000 ports.
+4. In `./conf/mrcp-asr.conf`, update:
+   - `AUDIO_CONTROLLER_ADDR` — The Bauda service address (the default is currently valid).
+   - `AUTH_APPID` and `AUTH_APPKEY` — Credentials obtained from Baidu.
+   - Other fields generally do not need adjustment.
+5. `./conf/comlog.conf` — Logging configuration. `4` and `16` represent log verbosity levels. Set both to `4` if debug logging is not needed.
+6. After setting the server IP in step 2, update `./conf/unimrcpserver_control.conf`: set the listening IP in `_check_cmd_pro` to the same server IP.
 
-四 说明
+## 3. Starting the Server
 
-1. 开启音频保存后，audio目录下的文件请定时清理。log目录下的日志也需要定时清理
+1. During initial debugging and deployment, start the server in the foreground to see console output:
 
-五 Docker 使用说明
+   ```bash
+   ./bin/unimrcpserver -r . &
+   ```
 
-1. 仓库根目录的 docker-compose.yaml 是本地演示和调试用文件，用于快速启动当前目录下的 MRCP Server。
-2. GitHub Actions 打包发布流程文件位于 .github/workflows/mrcp-docker.yml，用于构建并推送 Docker 镜像，不作为本地运行配置使用。
-3. 由于仓库内自带的 bin/unimrcpserver 为 Linux x86_64 ELF 二进制镜像，Docker 镜像仅支持 linux/amd64。
-4. plugin 目录下的大型 .so 文件通过 Git LFS 管理，构建镜像前请先执行 git lfs pull，确保本地已拿到真实文件。
+2. For production deployment, run as a daemon using the provided `supervise` script:
 
-六 使用 Docker Compose 本地启动
+   ```bash
+   ./bin/unimrcpserver_control start
+   ./bin/unimrcpserver_control stop
+   ./bin/unimrcpserver_control restart
+   ```
 
-1. 准备 Docker 环境。如果是 Apple Silicon 机器，建议启用 buildx，并使用 linux/amd64 平台构建。
-1. 首次构建镜像：
+## 4. Notes
 
-```bash
-git lfs pull
-docker compose build
-```
+1. When audio saving is enabled, clean up files under the `audio/` directory regularly. Log files under `log/` should also be purged periodically.
 
-1. 启动服务：
+## 5. Docker Overview
 
-```bash
-docker compose up -d
-```
+1. The `docker-compose.yaml` in the repository root is for local demonstration and debugging — it quickly starts the MRCP Server from the current directory.
+2. The GitHub Actions workflow at `.github/workflows/mrcp-docker.yml` builds and pushes Docker images; it is **not** intended for local execution.
+3. Because the bundled `bin/unimrcpserver` is a Linux x86_64 ELF binary, the Docker image supports **linux/amd64 only**.
+4. Large `.so` files under `plugin/` are managed by **Git LFS**. Run `git lfs pull` before building the image to ensure the real files are present locally.
 
-1. 查看日志：
+## 6. Running Locally with Docker Compose
 
-```bash
-docker compose logs -f mrcp-server
-```
+1. Prepare your Docker environment. On Apple Silicon machines, enable Buildx and build for the `linux/amd64` platform.
+2. First-time image build:
 
-1. 停止服务：
+   ```bash
+   git lfs pull
+   docker compose build
+   ```
 
-```bash
-docker compose down
-```
+3. Start the service:
 
-七 使用外部 conf 覆盖内置配置
+   ```bash
+   docker compose up -d
+   ```
 
-1. 默认会把 mrcp-server/conf 挂载到容器内的 /opt/mrcp-server/conf。
-1. 如果希望使用外部目录覆盖配置，可以在仓库根目录创建 conf 目录，并复制需要修改的配置文件。
-1. 然后通过环境变量指定该目录：
+4. View logs:
 
-```bash
-mkdir -p conf
-cp mrcp-server/conf/unimrcpserver.xml conf/
-cp mrcp-server/conf/mrcp-asr.conf conf/
+   ```bash
+   docker compose logs -f mrcp-server
+   ```
 
-MRCP_CONF_DIR=./conf docker compose up -d
-```
+5. Stop the service:
 
-1. docker-compose.yaml 同时支持以下环境变量：
+   ```bash
+   docker compose down
+   ```
 
-```bash
-MRCP_IMAGE=bytedesk/mrcp
-MRCP_TAG=latest
-MRCP_CONTAINER_NAME=mrcp-server
-MRCP_PORT=1544
-RTSP_PORT=1554
-SIP_PORT=5060
-RTP_PORT_RANGE=5000-6000
-MRCP_CONF_DIR=./conf
-MRCP_LOG_DIR=./docker/log
-MRCP_AUDIO_DIR=./docker/audio
-```
+## 7. Overriding Configuration with an External `conf` Directory
 
-八 镜像打包与发布
+1. By default, `mrcp-server/conf` is mounted into the container at `/opt/mrcp-server/conf`.
+2. To override with an external directory, create a `conf` folder in the repository root and copy only the files you need to customize.
+3. Specify the directory via an environment variable:
 
-1. 工作流文件：.github/workflows/mrcp-docker.yml
-1. 触发方式：
-    - 推送标签 v1.0.0
-    - 在 GitHub Actions 页面手动执行 workflow_dispatch
-1. 工作流会执行以下动作：
-    - checkout 仓库并拉取 Git LFS 文件
-    - 构建 linux/amd64 Docker 镜像
-    - 按需推送到 Docker Hub 和阿里云镜像仓库
-    - 在标签发布时创建 GitHub Release
-1. 需要预先配置的 GitHub Secrets：
-    - DOCKER_HUB_USERNAME
-    - DOCKER_HUB_ACCESS_TOKEN
-    - ALIYUN_DOCKER_USERNAME
-    - ALIYUN_DOCKER_PASSWORD
+   ```bash
+   mkdir -p conf
+   cp mrcp-server/conf/unimrcpserver.xml conf/
+   cp mrcp-server/conf/mrcp-asr.conf conf/
 
-九 常见注意事项
+   MRCP_CONF_DIR=./conf docker compose up -d
+   ```
 
-1. 如果在 macOS Apple Silicon 上本地构建失败，请改用：
+4. `docker-compose.yaml` supports the following environment variables:
 
-```bash
-DOCKER_DEFAULT_PLATFORM=linux/amd64 docker compose build
-```
+   ```bash
+   MRCP_IMAGE=bytedesk/mrcp
+   MRCP_TAG=latest
+   MRCP_CONTAINER_NAME=mrcp-server
+   MRCP_PORT=1544
+   RTSP_PORT=1554
+   SIP_PORT=5060
+   RTP_PORT_RANGE=5000-6000
+   MRCP_CONF_DIR=./conf
+   MRCP_LOG_DIR=./docker/log
+   MRCP_AUDIO_DIR=./docker/audio
+   ```
 
-1. RTP 使用 5000-6000/udp 端口范围，部署到云主机或容器平台时需要同步放通该端口段。
-1. 如果修改了对外服务 IP、SIP 端口或 RTP 范围，请同步检查 mrcp-server/conf/unimrcpserver.xml 和 mrcp-server/conf/unimrcpserver_control.conf 中的相关配置。
+## 8. Image Build & Release
+
+1. Workflow file: `.github/workflows/mrcp-docker.yml`
+2. Triggers:
+   - Pushing a tag (e.g. `v1.0.0`)
+   - Manually running `workflow_dispatch` from the GitHub Actions UI
+3. The workflow performs the following steps:
+   - Checks out the repository and pulls Git LFS files
+   - Builds a `linux/amd64` Docker image
+   - Optionally pushes to Docker Hub and Alibaba Cloud Container Registry
+   - Creates a GitHub Release when triggered by a tag
+4. Required GitHub Secrets:
+   - `DOCKER_HUB_USERNAME`
+   - `DOCKER_HUB_ACCESS_TOKEN`
+   - `ALIYUN_DOCKER_USERNAME`
+   - `ALIYUN_DOCKER_PASSWORD`
+
+## 9. Common Issues & Tips
+
+1. If the build fails on macOS Apple Silicon, use:
+
+   ```bash
+   DOCKER_DEFAULT_PLATFORM=linux/amd64 docker compose build
+   ```
+
+2. RTP uses the UDP port range **5000–6000**. When deploying to a cloud host or container platform, ensure this port range is open.
+3. If you change the external service IP, SIP port, or RTP port range, remember to update the corresponding settings in both `mrcp-server/conf/unimrcpserver.xml` and `mrcp-server/conf/unimrcpserver_control.conf`.
