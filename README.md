@@ -107,7 +107,7 @@ MRCP_AUDIO_DIR=./docker/audio
 
 1. 工作流文件：.github/workflows/mrcp-docker.yml
 1. 触发方式：
-    - 推送标签 mrcp-v1.0.0
+    - 推送标签 v1.0.0
     - 在 GitHub Actions 页面手动执行 workflow_dispatch
 1. 工作流会执行以下动作：
     - checkout 仓库并拉取 Git LFS 文件
